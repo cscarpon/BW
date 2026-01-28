@@ -45,6 +45,12 @@ interface WorkoutDao {
     @Query("SELECT * FROM workout_sets WHERE date = :date")
     suspend fun getSets(date: String): List<WorkoutSetEntity>
 
+    @Query("SELECT DISTINCT name FROM workout_exercises ORDER BY name ASC")
+    suspend fun getAllExerciseNames(): List<String>
+
+    @Query("SELECT * FROM workout_sets")
+    suspend fun getAllSets(): List<WorkoutSetEntity>
+
     @Query("DELETE FROM workout_days WHERE date = :date")
     suspend fun deleteDay(date: String)
 
@@ -116,5 +122,4 @@ abstract class AppDb : RoomDatabase() {
             }
     }
 }
-
 
