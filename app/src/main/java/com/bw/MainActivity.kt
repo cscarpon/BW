@@ -98,7 +98,7 @@ private fun WorkoutApp() {
                 )
                 NavigationBarItem(
                     selected = currentPage == WorkoutPage.TOTALS,
-                    onClick = { WorkoutPage.TOTALS },
+                    onClick = { currentPage = WorkoutPage.TOTALS },
                     icon = { Text("📊") },
                     label = { Text("Totals") }
                 )
@@ -455,25 +455,26 @@ private fun TotalsScreen(dao: WorkoutDao) {
 
     fun refreshTotals() {
         scope.launch {
-            val sets = withContext(Dispatchers.IO) { dao.getAllSets() }
+            val totals = withContext(Dispatchers.IO) { dao.getTotalsByExercise() }
+            val overallTotal = withContext(Dispatchers.IO) { dao.getAllTimeTotalReps() }
             val grouped = mutableMapOf<String, Int>()
             val groupNames = mutableMapOf<String, MutableList<String>>()
 
-            sets.forEach { set ->
-                val key = normalizeExerciseName(set.exerciseName)
-                grouped[key] = (grouped[key] ?: 0) + set.reps
-                groupNames.getOrPut(key) { mutableListOf() }.add(set.exerciseName)
+            totals.forEach { item ->
+                val key = normalizeExerciseName(item.exerciseName)
+                grouped[key] = (grouped[key] ?: 0) + item.totalReps
+                groupNames.getOrPut(key) { mutableListOf() }.add(item.exerciseName)
             }
 
-            val totals = grouped.map { (key, total) ->
+            val normalizedTotals = grouped.map { (key, total) ->
                 val displayName = groupNames[key]?.let { chooseDisplayName(it) }
                     ?: key.replaceFirstChar { it.titlecase() }
                 ExerciseTotal(displayName, total)
             }.sortedByDescending { it.totalReps }
 
-            allTimeTotal = grouped.values.sum()
+            allTimeTotal = overallTotal
             totalsByExercise.clear()
-            totalsByExercise.addAll(totals.take(10))
+            totalsByExercise.addAll(normalizedTotals.take(10))
         }
     }
 
