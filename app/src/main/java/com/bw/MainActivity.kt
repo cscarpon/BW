@@ -31,10 +31,10 @@ import java.time.YearMonth
 
 data class ExerciseRow(val id: Long, val name: String, val reps: MutableList<String>)
 
-enum class WorkoutPage(val title: String) {
-    HOME("Home"),
-    TRACK("Track"),
-    TOTALS("Totals")
+enum class WorkoutPage() {
+    HOME(),
+    TRACK(),
+    TOTALS()
 }
 
 class MainActivity : ComponentActivity() {
@@ -111,6 +111,7 @@ private fun WorkoutApp() {
                     activeDates = activeDates,
                     onRefresh = { refreshActiveDates() }
                 )
+
                 WorkoutPage.TRACK -> TrackWorkoutScreen(
                     dao = dao,
                     exerciseSuggestions = exerciseSuggestions,
@@ -119,6 +120,7 @@ private fun WorkoutApp() {
                         refreshExerciseSuggestions()
                     }
                 )
+
                 WorkoutPage.TOTALS -> TotalsScreen(dao = dao)
             }
         }
@@ -160,9 +162,7 @@ private fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = { month = month.minusMonths(1) }) {
-                        Text("◀")
-                    }
+                    OutlinedButton(onClick = { month = month.minusMonths(1) }) { Text("◀") }
                     Text(
                         text = "${month.month.name.lowercase().replaceFirstChar { it.titlecase() }} ${month.year}",
                         modifier = Modifier.weight(1f),
@@ -170,12 +170,11 @@ private fun HomeScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    OutlinedButton(onClick = { month = month.plusMonths(1) }) {
-                        Text("▶")
-                    }
+                    OutlinedButton(onClick = { month = month.plusMonths(1) }) { Text("▶") }
                 }
 
                 Spacer(Modifier.height(12.dp))
+
                 GitHubCalendar(
                     month = month,
                     activeDates = activeDatesSet
@@ -219,27 +218,40 @@ private fun GitHubCalendar(
     activeDates: Set<String>
 ) {
     val firstDay = month.atDay(1)
-    val leadingBlanks = firstDay.dayOfWeek.value - 1
+    val leadingBlanks = firstDay.dayOfWeek.value - 1 // Monday=1
     val totalDays = month.lengthOfMonth()
     val totalCells = leadingBlanks + totalDays
     val rows = (totalCells / 7) + if (totalCells % 7 == 0) 0 else 1
-    val cellSize = 32.dp
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    val cellSize = 32.dp
+    val gap = 6.dp
+
+    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+        // FIX 1: header uses same spacing/box sizing as grid rows (no SpaceBetween)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(gap)
+        ) {
             listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
-                Text(
-                    text = label,
-                    modifier = Modifier.width(cellSize),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(
+                    modifier = Modifier.size(cellSize),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
         repeat(rows) { rowIndex ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gap)
+            ) {
                 repeat(7) { colIndex ->
                     val cellIndex = rowIndex * 7 + colIndex
                     if (cellIndex < leadingBlanks || cellIndex >= leadingBlanks + totalDays) {
@@ -300,14 +312,14 @@ private fun TrackWorkoutScreen(
         rows.clear()
         rows.addAll(loaded)
         nextId = (rows.size + 1).toLong()
-        status = "Loaded $dateKey."
+        status = ""
     }
 
     fun saveDay() {
         scope.launch {
             status = "Saving $dateKey..."
             withContext(Dispatchers.IO) { saveRowsForDate(dao, dateKey, rows, setCount) }
-            status = "Saved $dateKey."
+            status = "Saved."
             onSave()
         }
     }
@@ -333,18 +345,14 @@ private fun TrackWorkoutScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
-                        Text("◀")
-                    }
+                    OutlinedButton(onClick = { selectedDate = selectedDate.minusDays(1) }) { Text("◀") }
                     Text(
                         text = dateKey,
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.titleLarge
                     )
-                    OutlinedButton(onClick = { selectedDate = selectedDate.plusDays(1) }) {
-                        Text("▶")
-                    }
+                    OutlinedButton(onClick = { selectedDate = selectedDate.plusDays(1) }) { Text("▶") }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -372,10 +380,11 @@ private fun TrackWorkoutScreen(
         )
         Spacer(Modifier.height(8.dp))
 
+        // FIX 3: Use widthIn for Total column + slightly reduce Exercise column weight
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HeaderCell("Exercise", Modifier.weight(1.6f))
+            HeaderCell("Exercise", Modifier.weight(1.3f))
             for (s in 1..setCount) HeaderCell("Set $s", Modifier.weight(1f))
-            HeaderCell("Total", Modifier.width(72.dp))
+            HeaderCell("Total", Modifier.widthIn(min = 56.dp, max = 72.dp))
         }
         HorizontalDivider()
 
@@ -391,7 +400,7 @@ private fun TrackWorkoutScreen(
                             value = row.name,
                             onValueChange = { newName -> rows[rIdx] = row.copy(name = newName) },
                             suggestions = exerciseSuggestions,
-                            modifier = Modifier.weight(1.6f)
+                            modifier = Modifier.weight(1.3f) // match header weight
                         )
 
                         for (sIdx in 0 until setCount) {
@@ -409,7 +418,7 @@ private fun TrackWorkoutScreen(
                         val total = row.reps.sumOf { it.toIntOrNull() ?: 0 }
                         BodyCellText(
                             text = total.toString(),
-                            modifier = Modifier.width(72.dp),
+                            modifier = Modifier.widthIn(min = 56.dp, max = 72.dp),
                             align = Alignment.Center,
                             bold = true
                         )
@@ -446,31 +455,30 @@ private fun TotalsScreen(dao: WorkoutDao) {
 
     fun refreshTotals() {
         scope.launch {
-            val sets = withContext(Dispatchers.IO) { dao.getAllSets() }
+            val totals = withContext(Dispatchers.IO) { dao.getTotalsByExercise() }
+            val overallTotal = withContext(Dispatchers.IO) { dao.getAllTimeTotalReps() }
             val grouped = mutableMapOf<String, Int>()
             val groupNames = mutableMapOf<String, MutableList<String>>()
 
-            sets.forEach { set ->
-                val key = normalizeExerciseName(set.exerciseName)
-                grouped[key] = (grouped[key] ?: 0) + set.reps
-                groupNames.getOrPut(key) { mutableListOf() }.add(set.exerciseName)
+            totals.forEach { item ->
+                val key = normalizeExerciseName(item.exerciseName)
+                grouped[key] = (grouped[key] ?: 0) + item.totalReps
+                groupNames.getOrPut(key) { mutableListOf() }.add(item.exerciseName)
             }
 
-            val totals = grouped.map { (key, total) ->
+            val normalizedTotals = grouped.map { (key, total) ->
                 val displayName = groupNames[key]?.let { chooseDisplayName(it) }
                     ?: key.replaceFirstChar { it.titlecase() }
                 ExerciseTotal(displayName, total)
             }.sortedByDescending { it.totalReps }
 
-            allTimeTotal = grouped.values.sum()
+            allTimeTotal = overallTotal
             totalsByExercise.clear()
-            totalsByExercise.addAll(totals.take(10))
+            totalsByExercise.addAll(normalizedTotals.take(10))
         }
     }
 
-    LaunchedEffect(Unit) {
-        refreshTotals()
-    }
+    LaunchedEffect(Unit) { refreshTotals() }
 
     Column(
         modifier = Modifier
@@ -521,7 +529,7 @@ private fun TotalsScreen(dao: WorkoutDao) {
                             item.totalReps.toString(),
                             fontWeight = FontWeight.SemiBold,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.width(72.dp)
+                            modifier = Modifier.widthIn(min = 56.dp, max = 72.dp)
                         )
                     }
                     Spacer(Modifier.height(6.dp))
@@ -541,8 +549,7 @@ private fun TotalsScreen(dao: WorkoutDao) {
 @Composable
 private fun HeaderCell(text: String, modifier: Modifier) {
     Box(
-        modifier = modifier
-            .padding(6.dp),
+        modifier = modifier.padding(6.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Text(text, style = MaterialTheme.typography.titleSmall)
@@ -557,8 +564,7 @@ private fun BodyCellText(
     bold: Boolean = false
 ) {
     Box(
-        modifier = modifier
-            .padding(6.dp),
+        modifier = modifier.padding(6.dp),
         contentAlignment = align
     ) {
         Text(
@@ -590,22 +596,18 @@ private fun ExerciseNameCell(
         expanded = expanded && filteredSuggestions.isNotEmpty(),
         onExpandedChange = { expanded = !expanded }
     ) {
+        // FIX 2: force single line; use new menuAnchor overload
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = modifier
                 .padding(6.dp)
-                .menuAnchor(),
-            maxLines = 2,
-            minLines = 1,
-            singleLine = false,
-            textStyle = LocalTextStyle.current.copy(
-                textAlign = TextAlign.Start
-            ),
-            placeholder = { Text("Exercise name") },
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-            }
+                .menuAnchor(MenuAnchorType.PrimaryEditable),
+            singleLine = true,
+            maxLines = 1,
+            textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start),
+            placeholder = { Text("Exercise name", maxLines = 1) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
         )
 
         ExposedDropdownMenu(
@@ -614,7 +616,7 @@ private fun ExerciseNameCell(
         ) {
             filteredSuggestions.take(8).forEach { suggestion ->
                 DropdownMenuItem(
-                    text = { Text(suggestion) },
+                    text = { Text(suggestion, maxLines = 1) },
                     onClick = {
                         onValueChange(suggestion)
                         expanded = false
@@ -631,10 +633,7 @@ private fun RepsCell(
     onValueChange: (String) -> Unit,
     modifier: Modifier
 ) {
-    Box(
-        modifier = modifier
-            .padding(6.dp)
-    ) {
+    Box(modifier = modifier.padding(6.dp)) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
