@@ -39,6 +39,9 @@ interface WorkoutDao {
     @Query("SELECT date FROM workout_days ORDER BY date DESC")
     suspend fun getActiveDates(): List<String>
 
+    @Query("SELECT DISTINCT name FROM workout_exercises ORDER BY name ASC")
+    suspend fun getAllExerciseNames(): List<String>
+
     @Query("SELECT * FROM workout_exercises WHERE date = :date ORDER BY position ASC")
     suspend fun getExercises(date: String): List<WorkoutExerciseEntity>
 
