@@ -31,10 +31,10 @@ import java.time.YearMonth
 
 data class ExerciseRow(val id: Long, val name: String, val reps: MutableList<String>)
 
-enum class WorkoutPage() {
-    HOME(),
-    TRACK(),
-    TOTALS()
+enum class WorkoutPage {
+    HOME,
+    TRACK,
+    TOTALS
 }
 
 class MainActivity : ComponentActivity() {
@@ -175,6 +175,7 @@ private fun HomeScreen(
 
                 Spacer(Modifier.height(12.dp))
 
+                // FIX 1: Calendar fills available width
                 GitHubCalendar(
                     month = month,
                     activeDates = activeDatesSet
@@ -218,68 +219,63 @@ private fun GitHubCalendar(
     activeDates: Set<String>
 ) {
     val firstDay = month.atDay(1)
-    val leadingBlanks = firstDay.dayOfWeek.value - 1 // Monday=1
+    val leadingBlanks = firstDay.dayOfWeek.value - 1 // Monday=1..Sunday=7
     val totalDays = month.lengthOfMonth()
     val totalCells = leadingBlanks + totalDays
-    val rows = (totalCells / 7) + if (totalCells % 7 == 0) 0 else 1
+    val rows = (totalCells + 6) / 7
 
-    val cellSize = 32.dp
     val gap = 6.dp
 
-    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-        // FIX 1: header uses same spacing/box sizing as grid rows (no SpaceBetween)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(gap)
-        ) {
-            listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
-                Box(
-                    modifier = Modifier.size(cellSize),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val cellSize = (maxWidth - (gap * 6)) / 7
 
-        repeat(rows) { rowIndex ->
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(gap)
             ) {
-                repeat(7) { colIndex ->
-                    val cellIndex = rowIndex * 7 + colIndex
-                    if (cellIndex < leadingBlanks || cellIndex >= leadingBlanks + totalDays) {
-                        Box(
-                            modifier = Modifier
-                                .size(cellSize)
-                                .background(Color.Transparent)
+                listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
+                    Box(
+                        modifier = Modifier.size(cellSize),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    } else {
-                        val dayNumber = cellIndex - leadingBlanks + 1
-                        val date = month.atDay(dayNumber)
-                        val isActive = activeDates.contains(date.toString())
-                        Box(
-                            modifier = Modifier
-                                .size(cellSize)
-                                .background(
-                                    color = if (isActive) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(6.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = dayNumber.toString(),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (isActive) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    }
+                }
+            }
+
+            repeat(rows) { rowIndex ->
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    repeat(7) { colIndex ->
+                        val cellIndex = rowIndex * 7 + colIndex
+                        if (cellIndex < leadingBlanks || cellIndex >= leadingBlanks + totalDays) {
+                            Box(modifier = Modifier.size(cellSize))
+                        } else {
+                            val dayNumber = cellIndex - leadingBlanks + 1
+                            val date = month.atDay(dayNumber)
+                            val isActive = activeDates.contains(date.toString())
+
+                            Box(
+                                modifier = Modifier
+                                    .size(cellSize)
+                                    .background(
+                                        color = if (isActive) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(6.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dayNumber.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (isActive) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -305,6 +301,11 @@ private fun TrackWorkoutScreen(
     val dateKey = remember(selectedDate) { selectedDate.toString() }
 
     var status by remember { mutableStateOf("") }
+
+    // FIX 2/3: lock column widths so exercise cannot steal the whole row
+    val exerciseW = 140.dp
+    val setW = 64.dp
+    val totalW = 64.dp
 
     LaunchedEffect(dateKey) {
         status = "Loading $dateKey..."
@@ -380,11 +381,10 @@ private fun TrackWorkoutScreen(
         )
         Spacer(Modifier.height(8.dp))
 
-        // FIX 3: Use widthIn for Total column + slightly reduce Exercise column weight
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HeaderCell("Exercise", Modifier.weight(1.3f))
-            for (s in 1..setCount) HeaderCell("Set $s", Modifier.weight(1f))
-            HeaderCell("Total", Modifier.widthIn(min = 56.dp, max = 72.dp))
+            HeaderCell("Exercise", Modifier.width(exerciseW))
+            for (s in 1..setCount) HeaderCell("Set $s", Modifier.width(setW))
+            HeaderCell("Total", Modifier.width(totalW))
         }
         HorizontalDivider()
 
@@ -400,7 +400,7 @@ private fun TrackWorkoutScreen(
                             value = row.name,
                             onValueChange = { newName -> rows[rIdx] = row.copy(name = newName) },
                             suggestions = exerciseSuggestions,
-                            modifier = Modifier.weight(1.3f) // match header weight
+                            modifier = Modifier.width(exerciseW)
                         )
 
                         for (sIdx in 0 until setCount) {
@@ -411,14 +411,14 @@ private fun TrackWorkoutScreen(
                                     val newReps = row.reps.toMutableList().also { it[sIdx] = filtered }
                                     rows[rIdx] = row.copy(reps = newReps)
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.width(setW)
                             )
                         }
 
                         val total = row.reps.sumOf { it.toIntOrNull() ?: 0 }
                         BodyCellText(
                             text = total.toString(),
-                            modifier = Modifier.widthIn(min = 56.dp, max = 72.dp),
+                            modifier = Modifier.width(totalW),
                             align = Alignment.Center,
                             bold = true
                         )
@@ -529,7 +529,7 @@ private fun TotalsScreen(dao: WorkoutDao) {
                             item.totalReps.toString(),
                             fontWeight = FontWeight.SemiBold,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.widthIn(min = 56.dp, max = 72.dp)
+                            modifier = Modifier.width(72.dp)
                         )
                     }
                     Spacer(Modifier.height(6.dp))
@@ -552,7 +552,7 @@ private fun HeaderCell(text: String, modifier: Modifier) {
         modifier = modifier.padding(6.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Text(text, style = MaterialTheme.typography.titleSmall)
+        Text(text, style = MaterialTheme.typography.titleSmall, maxLines = 1)
     }
 }
 
@@ -573,7 +573,8 @@ private fun BodyCellText(
             textAlign = when (align) {
                 Alignment.Center, Alignment.CenterEnd -> TextAlign.Center
                 else -> TextAlign.Start
-            }
+            },
+            maxLines = 1
         )
     }
 }
@@ -596,17 +597,18 @@ private fun ExerciseNameCell(
         expanded = expanded && filteredSuggestions.isNotEmpty(),
         onExpandedChange = { expanded = !expanded }
     ) {
-        // FIX 2: force single line; use new menuAnchor overload
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = modifier
                 .padding(6.dp)
+                // New API; if this doesn't compile with your Material3 version,
+                // change to .menuAnchor() and ignore the deprecation warning.
                 .menuAnchor(MenuAnchorType.PrimaryEditable),
             singleLine = true,
             maxLines = 1,
             textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start),
-            placeholder = { Text("Exercise name", maxLines = 1) },
+            placeholder = { Text("Exercise", maxLines = 1) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
         )
 
